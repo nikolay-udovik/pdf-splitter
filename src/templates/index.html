@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PDF Split and Zip</title>
+    <script src="{{ url_for('static', filename='ui/scripts/socket.io.js') }}"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            background-image: url('{{ url_for('static', filename='ui/images/background.jpg') }}');
+            background-size: cover;
+            background-position: center;
+        }
+        .container {
+            text-align: center;
+            width: 600px; /* Adjust based on preference */
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-top: 50px;
+            border-radius: 10px;
+            background-color: #d3d3d3; /* Solid gray background */
+        }
+        #output { 
+            white-space: pre-wrap; 
+            background-color: #f0f0f0; 
+            padding: 10px; 
+            margin-top: 20px; 
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        .log { color: #333; }
+        .error { color: red; }
+        .info { color: blue; }
+        #downloadButton { display: none; margin-top: 20px; }
+        button { 
+            padding: 12px 24px; /* Slightly larger for better touch */
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 16px; /* Larger font size */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+            transition: background-color 0.3s ease; /* Smooth transition for hover */
+        }
+        button:hover { 
+            background-color: #0056b3; 
+        }
+        h2.description {
+            font-size: 16px;
+            color: #666;
+            margin-top: -10px;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload PDF to Split and Zip</h1>
+        <h2 class="description">Split your PDF files into smaller parts with our tool, where you can set the maximum size per part for tailored file management.</h2>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <label for="pdf_file">Select PDF File:</label>
+            <input type="file" name="pdf_file" id="pdf_file" required><br><br>
+            
+            <label for="max_size">Maximum Size per Part (in MB):</label>
+            <input type="number" name="max_size" id="max_size" placeholder="Max size in MB" value="10" required><br><br>
+            
+            <label for="part_prefix">Part Prefix:</label>
+            <input type="text" name="part_prefix" id="part_prefix" placeholder="Part prefix" value="part" required><br><br>
+            
+            <button type="submit">Upload and Process</button>
+        </form>
+        <div id="output"></div>
+        <button id="downloadButton">Download</button>
+    </div>
+    <script>
+        const socket = io(); // Connect to the server's Socket.IO instance
+        let sid; // Store the session ID when connected
+
+        socket.on('connect', () => {
+            sid = socket.id; // Capture the session ID upon connection
+            console.log('Connected with SID:', sid);
+        });
+
+        socket.on('script_output', (msg) => {
+            const outputElement = document.getElementById('output');
+            outputElement.innerHTML += `<div class="log">${msg.data}</div>`; // Append script output as log
+        });
+
+        socket.on('script_complete', (msg) => {
+            const outputElement = document.getElementById('output');
+            outputElement.innerHTML += `<div class="info">Processing complete.</div>`; // Append completion message
+
+            // Display the download button with the correct link
+            const downloadButton = document.getElementById('downloadButton');
+            downloadButton.href = msg.download_link; // Set the download link
+            downloadButton.style.display = 'block'; // Make the button visible
+            downloadButton.addEventListener('click', () => {
+                window.location.href = msg.download_link;
+            });
+        });
+
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault(); // Prevent the default form submission
+
+            const formData = new FormData(this);
+            formData.append('sid', sid); // Append the session ID to the form data
+
+            fetch('/process', {
+                method: 'POST',
+                body: formData,
+            }).then(response => response.json())
+              .then(data => {
+                  console.log(data); // Log the server's response
+              }).catch(error => {
+                  console.error('Error:', error);
+                  const outputElement = document.getElementById('output');
+                  outputElement.innerHTML += `<div class="error">${error.toString()}</div>`; // Display errors as log
+              });
+        });
+    </script>
+</body>
+</html>
